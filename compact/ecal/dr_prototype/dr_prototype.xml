@@ -1,0 +1,148 @@
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!--
+  DR Prototype: Sub-compact detector XML
+  Phase: 2c (plan-dr-prototype.md)
+  Date: 2026-07-06
+
+  ID collision preflight (plan todo 2c.5):
+    grep -rn 'name="DRPrototype"'      compact/ src/ -> 0 hits (before this file)
+    grep -rn 'type="epic_DRPrototype"' compact/ src/ -> 0 hits
+    grep -rn 'name="DRPrototypeHits"'  compact/      -> 0 hits
+    All existing numeric detector IDs (from compact/definitions.xml + in-file IDs):
+      10-53, 59-93, 100-126, 131-132, 140-142, 150-182, 190-199.
+    IDs 200+ are completely unused.
+    Chosen ID: 200. Well clear of all existing detectors, visually distinct.
+
+  CellID bit budget (plan R9, decision 1):
+    system(8) + fiber(16) + end(1) + channel(1) = 26 bits of 64 used.
+    Fiber count for 200x200 mm face, 1.35x1.22 mm rectangular pitch:
+      N_x = floor(200/1.35) = 148 columns
+      N_y = floor(200/1.22) = 163 rows
+      N_total = 148 * 163 = 24 124 fibers
+      log2(24124) = 14.56 -> 16 bits sufficient with ample headroom.
+    SiPM windows: 24 124 * 2 ends = 48 248 volumes.
+    end:     0 = -z face SiPM, 1 = +z face SiPM.
+    channel: 0 = scintillating fiber (DR_Polystyrene core, S-channel),
+             1 = Cherenkov fiber    (DR_PMMA core, C-channel).
+    channel bit is set at fiber placement time in DRPrototype_geo.cpp from the
+    deterministic S:C lattice mask; it duplicates material identity but allows
+    trivial S/C separation at analysis time without material lookup.
+
+  Default S:C ratio = 4:1 (the middle rung of the five-ratio scan).
+  Top-level compacts override DR_sc_ratio_S and DR_sc_ratio_C by including their
+  own <define> block BEFORE including this sub-compact.  DD4hep evaluates constants
+  in document order; the last definition of a given name wins.  Since this file's
+  <define> block is processed when this file is included (after the top-level define
+  block), we use a pattern where the top-level redefines these constants explicitly.
+  The plugin reads them via detElem.attr<int>(_Unicode(sc_ratio_S)) etc., which are
+  passed as XML attributes on the <detector> element (not as compact constants), so
+  the five ratio variants each write different attribute values directly — no
+  constant-override mechanism is needed.
+-->
+
+<lccdd>
+
+  <define>
+    <!-- Module envelope (GlueX-derived, research-DR-baseline.md section 1.1) -->
+    <constant name="DR_module_dx"              value="200.0*mm"/>
+    <constant name="DR_module_dy"              value="200.0*mm"/>
+    <constant name="DR_module_dz"              value="1000.0*mm"/>
+
+    <!-- Fiber geometry (research-DR-baseline.md section 1.2) -->
+    <constant name="DR_fiber_od"               value="1.0*mm"/>
+    <constant name="DR_fiber_pitch_x"          value="1.35*mm"/>   <!-- azimuthal (column) pitch -->
+    <constant name="DR_fiber_pitch_y"          value="1.22*mm"/>   <!-- radial (row) pitch -->
+
+    <!-- SiPM window geometry -->
+    <constant name="DR_sipm_window_thickness"  value="0.1*mm"/>    <!-- thin scoring window -->
+    <constant name="DR_sipm_window_gap"        value="0.05*mm"/>   <!-- air gap between fiber end and window -->
+
+    <!-- Default S:C ratio (4:1, middle rung).
+         Top-level ratio-variant compacts pass different values as attributes
+         on the <detector> element below; these constants serve as documentation. -->
+    <constant name="DR_sc_ratio_S"             value="4"/>
+    <constant name="DR_sc_ratio_C"             value="1"/>
+
+    <!-- Detector system ID.
+         Chosen after collision preflight: 200 is the first unused value.
+         All existing IDs end at 199 (TaggerCalorimeter_ID=199 in definitions.xml).
+         See collision preflight note at top of this file. -->
+    <constant name="DRPrototype_ID"            value="200"/>
+  </define>
+
+  <detectors>
+    <!--
+      DRPrototype: Dual-Readout Fiber Calorimeter Prototype Module
+
+      Geometry:
+        200 x 200 x 1000 mm Pb absorber block with embedded fiber lattice.
+        Fibers: 1.35 mm (x) x 1.22 mm (y) rectangular pitch, 1.0 mm OD.
+        Each fiber: FluorinatedPolymer cladding (n=1.42, annulus 0.485-0.500 mm r)
+                    + Polystyrene or PMMA core (r < 0.485 mm).
+        S/C assignment: deterministic pattern based on sc_ratio_S:sc_ratio_C.
+        SiPM windows: thin AirOptical box at each fiber end (±z), sensitive.
+
+      SD architecture (plan design principle):
+        sens.setType("tracker") -> Geant4TrackerAction -> one SimTrackerHit per detected photon.
+        DR_SiPMSurf SkinSurface on each window volume -> EFFICIENCY table governs detection.
+        1 hit = 1 detected photoelectron. No analysis-time PDE weight.
+
+      Attributes passed to plugin:
+        sc_ratio_S, sc_ratio_C: integers defining the S:C fiber ratio.
+        These are read by the plugin from the XML element attributes.
+    -->
+    <detector
+      id="DRPrototype_ID"
+      name="DRPrototype"
+      type="epic_DRPrototype"
+      readout="DRPrototypeHits"
+      sc_ratio_S="4"
+      sc_ratio_C="1"
+      calorimeterType="EM"
+      >
+      <!-- Geometry parameters (plugin reads these from <dimensions> child) -->
+      <dimensions
+        dx="DR_module_dx"
+        dy="DR_module_dy"
+        dz="DR_module_dz"
+        fiber_od="DR_fiber_od"
+        fiber_pitch_x="DR_fiber_pitch_x"
+        fiber_pitch_y="DR_fiber_pitch_y"
+        sipm_window_thickness="DR_sipm_window_thickness"
+        sipm_window_gap="DR_sipm_window_gap"
+        />
+      <!-- SiPM window material and surface -->
+      <sensors>
+        <sipm
+          material="AirOptical"
+          surface="DR_SiPMSurf"
+          />
+      </sensors>
+    </detector>
+  </detectors>
+
+  <readouts>
+    <readout name="DRPrototypeHits">
+      <!--
+        CellID bit allocation (plan-dr-prototype.md decision 1, R9):
+          system  :  8 bits  [0..7]   detector system ID (200)
+          fiber   : 16 bits  [8..23]  global fiber index in [0, N_fibers)
+          end     :  1 bit   [24]     0 = -z SiPM, 1 = +z SiPM
+          channel :  1 bit   [25]     0 = S (DR_Polystyrene), 1 = C (DR_PMMA)
+          Total   : 26 bits used of 64 available.
+
+        PhysVolIDs are set on window placements in DRPrototype_geo.cpp:
+          window_pv.addPhysVolID("fiber",   global_fiber_index)   // 0..N_fibers-1
+          window_pv.addPhysVolID("end",     end_id)               // 0 or 1
+          window_pv.addPhysVolID("channel", channel_id)           // 0 (S) or 1 (C)
+        The "system" bit is set by the top-level assembly placement via:
+          env_pv.addPhysVolID("system", DRPrototype_ID)
+
+        No <segmentation> block: cellID is fully determined by PhysVolIDs.
+        The NoSegmentation type makes this explicit.
+      -->
+      <id>system:8,fiber:16,end:1,channel:1</id>
+    </readout>
+  </readouts>
+
+</lccdd>

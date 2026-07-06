@@ -1,0 +1,50 @@
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!--
+  DR Prototype sub-compact variant: S:C = 99:1 (1% C fraction)
+  Included by epic_dr_prototype_99x1.xml.
+-->
+<lccdd>
+  <define>
+    <constant name="DR_module_dx"              value="200.0*mm"/>
+    <constant name="DR_module_dy"              value="200.0*mm"/>
+    <constant name="DR_module_dz"              value="1000.0*mm"/>
+    <constant name="DR_fiber_od"               value="1.0*mm"/>
+    <constant name="DR_fiber_pitch_x"          value="1.35*mm"/>
+    <constant name="DR_fiber_pitch_y"          value="1.22*mm"/>
+    <constant name="DR_sipm_window_thickness"  value="0.1*mm"/>
+    <constant name="DR_sipm_window_gap"        value="0.05*mm"/>
+    <constant name="DR_sc_ratio_S"             value="99"/>
+    <constant name="DR_sc_ratio_C"             value="1"/>
+    <constant name="DRPrototype_ID"            value="200"/>
+  </define>
+  <detectors>
+    <detector
+      id="DRPrototype_ID"
+      name="DRPrototype"
+      type="epic_DRPrototype"
+      readout="DRPrototypeHits"
+      sc_ratio_S="99"
+      sc_ratio_C="1"
+      calorimeterType="EM"
+      >
+      <dimensions
+        dx="DR_module_dx"
+        dy="DR_module_dy"
+        dz="DR_module_dz"
+        fiber_od="DR_fiber_od"
+        fiber_pitch_x="DR_fiber_pitch_x"
+        fiber_pitch_y="DR_fiber_pitch_y"
+        sipm_window_thickness="DR_sipm_window_thickness"
+        sipm_window_gap="DR_sipm_window_gap"
+        />
+      <sensors>
+        <sipm material="AirOptical" surface="DR_SiPMSurf"/>
+      </sensors>
+    </detector>
+  </detectors>
+  <readouts>
+    <readout name="DRPrototypeHits">
+      <id>system:8,fiber:16,end:1,channel:1</id>
+    </readout>
+  </readouts>
+</lccdd>
