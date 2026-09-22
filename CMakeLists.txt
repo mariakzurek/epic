@@ -45,6 +45,10 @@ include(GNUInstallDirs)
 
 # Dependencies
 find_package(DD4hep 1.27 REQUIRED COMPONENTS DDCore DDRec)
+find_package(Geant4 REQUIRED)
+if(NOT TARGET Geant4::G4parmodels OR NOT TARGET Geant4::G4geometry)
+  message(FATAL_ERROR "Required Geant4 fast-simulation targets (Geant4::G4parmodels, Geant4::G4geometry) not found - check Geant4 installation/version")
+endif()
 find_package(fmt REQUIRED)
 find_package(IRT2 2.1.1)
 
@@ -63,6 +67,7 @@ dd4hep_add_plugin(${a_lib_name}
   )
 target_link_libraries(${a_lib_name}
   PUBLIC DD4hep::DDCore DD4hep::DDRec fmt::fmt
+  PRIVATE DD4hep::DDG4 Geant4::G4parmodels Geant4::G4geometry
   )
 set(WITH_IRT1_SUPPORT TRUE CACHE STRING "Enable constant definitions used by EICrecon integration in IRT1")
 if(WITH_IRT1_SUPPORT)

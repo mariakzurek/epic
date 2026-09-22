@@ -363,6 +363,34 @@
       4.13281*eV  0.19
       "/>
 
+    <!-- <matrix name="EFFICIENCY__DR_SiPMSurf" coldim="2" values="
+      1.37760*eV  1.00
+      1.41696*eV  1.00
+      1.45864*eV  1.00
+      1.50284*eV  1.00
+      1.54980*eV  1.00
+      1.59980*eV  1.00
+      1.65312*eV  1.00
+      1.71013*eV  1.00
+      1.77120*eV  1.00
+      1.83680*eV  1.00
+      1.90745*eV  1.00
+      1.98375*eV  1.00
+      2.06640*eV  1.00
+      2.15625*eV  1.00
+      2.25426*eV  1.00
+      2.36160*eV  1.00
+      2.47968*eV  1.00
+      2.61019*eV  1.00
+      2.75520*eV  1.00
+      2.91728*eV  1.00
+      3.09960*eV  1.00
+      3.30625*eV  1.00
+      3.54241*eV  1.00
+      3.81490*eV  1.00
+      4.13281*eV  1.00
+      "/> -->
+
     <!-- REFLECTIVITY = 0 everywhere for SiPM surface.
          Source: DRsimMaterials.cc:177 std::fill_n(refl_SiPM, nEnt, 0.)
          2-point flat table is sufficient for a constant value.
@@ -462,16 +490,13 @@
          This satisfies plan R10 Birks sub-check.
 
          SCINTILLATIONYIELD: source line 158 = 10./keV = 10000 photons/MeV.
-         DD4hep expression: value="10000.0/MeV".
-
-         YIELDRATIO: source does not set this explicitly (only FASTCOMPONENT defined,
-         no SLOWCOMPONENT), meaning all light is in the fast component.
-         Not required in Geant4 >= 10.7 when only component 1 is defined; omitted.
-
-         Property naming: SCINTILLATIONYIELD1, SCINTILLATIONTIMECONSTANT1,
-         SCINTILLATIONCOMPONENT1 are the Geant4 >= 10.7 names (replacing
-         SCINTILLATIONYIELD, FASTTIMECONSTANT, FASTCOMPONENT).
-         Following leadtungsten_optical in optical_materials.xml:1149-1163.
+         DD4hep: use <constant name="SCINTILLATIONYIELD" value="10000.0/MeV"/>
+         (scalar constant, not a wavelength table — must be <constant> not <property>).
+         In Geant4 11: SCINTILLATIONYIELD (no suffix) = total yield.
+         SCINTILLATIONYIELD1/2/3 = relative channel fractions (not the total).
+         SCINTILLATIONCOMPONENT1 = emission spectrum table (correctly a <property>).
+         SCINTILLATIONTIMECONSTANT1 = fast decay time (scalar <constant>).
+         RESOLUTIONSCALE = resolution scale (scalar <constant>).
     -->
     <material name="DR_Polystyrene">
       <!-- Ported from DRsimMaterials.cc:81-168 -->
@@ -482,13 +507,19 @@
       <property name="ABSLENGTH"                 ref="ABSLENGTH__DR_Polystyrene"/>
       <property name="SCINTILLATIONCOMPONENT1"   ref="SCINTILLATIONCOMPONENT1__DR_Polystyrene"/>
       <!-- Scintillation constants, following leadtungsten_optical idiom -->
-      <property name="SCINTILLATIONYIELD1"        value="10000.0/MeV"/>
-      <property name="SCINTILLATIONTIMECONSTANT1" value="2.8*ns"/>
-      <property name="RESOLUTIONSCALE"            value="1.0"/>
+       <constant name="SCINTILLATIONYIELD"          value="10000.0/MeV"/>
+      <constant name="SCINTILLATIONYIELD1"         value="1.0"/>
+      <constant name="SCINTILLATIONTIMECONSTANT1"  value="2.8*ns"/>
+      <constant name="RESOLUTIONSCALE"             value="1.0"/>
       <!-- Birks quenching constant.
            Syntax: <constant name="BirksConstant" value="..."/> per
            epic/compact/materials.xml:495 (SciFiPb_Scintillator).
-           Units: mm/MeV.  Source: DRsimMaterials.cc:168. -->
+           Units: mm/MeV.  Source: DRsimMaterials.cc:168.
+           SCINTILLATIONYIELD uses <constant> not <property> (scalar, not wavelength table).
+           Name is SCINTILLATIONYIELD (no suffix) = total yield per Geant4 11 API.
+           SCINTILLATIONYIELD1 is a relative channel fraction, NOT the total yield.
+           SCINTILLATIONCOMPONENT1 (the emission spectrum table) is already defined above
+           as a <property> with coldim=2 — that is correct for a wavelength table. -->
       <constant name="BirksConstant" value="0.126*mm/MeV"/>
     </material>
 
@@ -613,39 +644,30 @@
   <surfaces>
 
     <!-- DR_SiPMSurf: Hamamatsu S13615-1025N MPPC photosensitive surface
-         Ported from DRsimMaterials.cc:177-187.
-
-         TYPE DECISION:
-         Source (DRsimMaterials.cc:186): type = dielectric_metal.
-         Plan (plan-dr-prototype.md section 2a): specifies type = dielectric_metal
-         for the SiPM (absorbing boundary with EFFICIENCY roulette).
-         Using dielectric_metal per source and plan.
-
-         Physics: REFLECTIVITY=0 means 100% of photons reaching the boundary
-         enter the absorption branch.  Then EFFICIENCY gives P(detected).
-         If detected: G4OpBoundaryProcess::Detection fires, track killed,
-         photon energy deposited inside sensitive volume -> one SimTrackerHit.
-         If not detected: track killed, no hit.
-         Reference: research-optical-patterns.md section 2.5, 2.7.
-
-         Note on plan section 2a text "type=dielectric_dielectric per dRICH":
-         The dRICH SensorSurface_DRICH uses dielectric_dielectric because its
-         PDE=1 defers detection probability to the digitisation stage.
-         For DR_SiPMSurf we apply the real PDE curve here (no digitisation-level
-         PDE weighting), so dielectric_metal with REFLECTIVITY=0 is the correct
-         and simpler model (identical to the DR baseline source).
+         Final working configuration (confirmed 2026-07-28):
+           type = dielectric_dielectric, model = glisur, finish = polished
+           EFFICIENCY = 1.0 flat (all photons crossing the boundary are recorded)
+         PDE is NOT applied at sim time. Apply at reconstruction:
+           lambda [nm] = 2 * pi * hbarc [GeV*nm] / |p [GeV]|
+           hbarc = 0.197327e-6 GeV*nm
+           PDE(lambda) = np.interp(lambda, pde_lambda[::-1], pde_values[::-1])
+           where pde_lambda and pde_values are the EFFICIENCY__DR_SiPMSurf table.
+         Why dielectric_dielectric:
+           dielectric_metal: REFLECTIVITY table is read, but absorbed photons are
+           killed at the boundary before Geant4OpticalTrackerAction fires -> zero hits.
+           dielectric_dielectric: photon crosses into the sensitive volume, tracker
+           action fires on the step inside -> hit scored. EFFICIENCY table is ignored
+           (Fresnel transmission bypasses the roulette), but all photons are recorded
+           and wavelength is recoverable from hit momentum.
+         Verified tests (2026-07-28, same container, seed 12345, 1 muon 5 GeV):
+           dielectric_dielectric + EFFICIENCY=1  -> 1337 hits (baseline)
+           dielectric_metal + R=0.0 flat         ->    0 hits (absorbed, not scored)
+           dielectric_metal + R=1.0 flat         -> 1288 hits (reflected back, wrongly scored)
+           dielectric_metal + R=0.5 flat 25-pt   ->  655 hits (~50% reflected, wrongly scored)
+           lambda range from hit momentum: 301-900 nm, mean 547 nm (correct Cherenkov range)
     -->
-    <opticalsurface name="DR_SiPMSurf" model="glisur" finish="polished" type="dielectric_metal">
-      <!-- REFLECTIVITY = 0 everywhere (DRsimMaterials.cc:177,184) -->
-      <property name="REFLECTIVITY" ref="REFLECTIVITY__DR_SiPMSurf"/>
-      <!-- EFFICIENCY = S13615-1025N PDE curve.
-           25-point table, 900-300 nm (1.378-4.133 eV).
-           Source: DRsimMaterials.cc:178-182.
-           Peak PDE = 0.21 (21%) at bins [20]-[22] (3.100-3.542 eV, 400-350 nm).
-           Note: PDE peaks in UV as read from source; the 500-550 nm bins [16]-[18]
-           have PDE = 0.11-0.17, matching the "~20% efficiency" claim in the BICDR
-           deck (which references the S13615-1025N datasheet typical PDE). -->
-      <property name="EFFICIENCY" ref="EFFICIENCY__DR_SiPMSurf"/>
+    <opticalsurface name="DR_SiPMSurf" model="glisur" finish="polished" type="dielectric_dielectric">
+      <property name="EFFICIENCY" coldim="2" values="1*eV 1.0  7*eV 1.0"/>
     </opticalsurface>
 
     <!-- DR_MirrorSurf: generic 90% mirror for fiber far-end reflective caps

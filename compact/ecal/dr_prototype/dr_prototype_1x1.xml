@@ -26,6 +26,11 @@
       readout="DRPrototypeHits"
       sc_ratio_S="1"
       sc_ratio_C="1"
+      vis_absorber="DR_PbAbsorberVis"
+      vis_s_fiber="DR_ScintFiberVis"
+      vis_c_fiber="DR_CherFiberVis"
+      vis_cladding="DR_FiberCladdingVis"
+      vis_sipm="DR_SiPMWindowVis"
       calorimeterType="EM"
       >
       <dimensions
@@ -48,4 +53,14 @@
       <id>system:8,fiber:16,end:1,channel:1</id>
     </readout>
   </readouts>
+
+  <display>
+    <vis name="DR_PbAbsorberVis" r="0.45" g="0.47" b="0.50" alpha="0.22" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_ModuleEnvelopeVis" r="0.70" g="0.72" b="0.75" alpha="0.12" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_ScintFiberVis" r="1.00" g="0.72" b="0.05" alpha="0.95" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_CherFiberVis" r="0.00" g="0.55" b="1.00" alpha="0.95" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_FiberCladdingVis" r="0.85" g="0.90" b="0.95" alpha="0.18" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_SiPMWindowVis" r="0.85" g="0.15" b="1.00" alpha="0.45" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_InvisibleVis" visible="false" showDaughters="true"/>
+  </display>
 </lccdd>

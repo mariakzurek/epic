@@ -23,22 +23,25 @@
 //
 // Assembly voxelization (REQUIRED, plan R17, research-optical-patterns.md §1.6):
 //   Two-tier hierarchy:
-//     - Outer: Assembly (unbounded) containing the Pb absorber and SiPM-window assemblies.
+//     - Outer: Assembly (unbounded) containing only the Pb absorber block.
 //     - Fiber grid assemblies placed INSIDE pbVol (daughters of the Pb block).
-//     - SiPM-window grid assemblies placed in the outer envelope (extend beyond Pb in z).
-//   This is the correct TGeo idiom: fibers are daughters of the Pb volume, so they
-//   replace Pb at their location.  Windows are siblings of Pb in the outer Assembly
-//   because they live at ±z beyond the absorber face.
-//   Each fiber assembly and each window assembly is Voxelize("")d.
+//       Each fiberAsm cell contains both the fiber tubes AND the two SiPM window
+//       disks at each end.  Windows are flush at the fiber end faces with a 1 µm
+//       epsilon to avoid coincident boundaries.
+  //   Fiber half-length is shortened by (sipm_win_thickness + 2×1 µm) so that all
+  //   volumes (fiber + both end windows) fit strictly within pbVol, with a 1 µm gap
+  //   between fiber end face and window, and another 1 µm between window and pbVol face.
+//   Each fiber grid assembly is Voxelize("")d.
 //
 // Fiber cladding (plan R16):
 //   Each fiber = full-radius FluorinatedPolymer cladding volume (mother) with
 //   Polystyrene or PMMA core placed inside as a daughter.
-//   Cladding volume: Tube(0, fiber_od_half, fiber_half_length) - solid cylinder of
-//   DR_FluorinatedPolymer (n=1.42).  Core volume: Tube(0, core_radius, ...) placed
+  //   Cladding volume: Tube(0, fiber_od_half, fiber_half_length) - solid cylinder of
+//   DR_PMMA (n=1.49).  Core volume: Tube(0, core_radius, ...) placed
 //   at (0,0,0) inside the cladding - daughter fully contained within mother.
 //   n(cladding) < n(core) everywhere: TIR guaranteed (plan R16).
-//   TIR critical angles: PS/FluoPoly=63.4 deg, PMMA/FluoPoly=72.6 deg.
+  //   TIR critical angles (single-clad SCSF-78): PS/PMMA = arcsin(1.49/1.59) = 69.6 deg.
+//   NA = 0.55, trapping efficiency ~3.1% per end (Kuraray datasheet).
 //
 //   NOTE: using a solid (non-annular) cladding tube avoids the "core protruding
 //   from annular mother" TGeo overlap error.  The solid cladding material fills
@@ -98,12 +101,18 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   const double fiber_pitch_x      = dims.attr<double>(_Unicode(fiber_pitch_x));
   const double fiber_pitch_y      = dims.attr<double>(_Unicode(fiber_pitch_y));
   const double sipm_win_thickness = dims.attr<double>(_Unicode(sipm_window_thickness));
-  const double sipm_win_gap       = dims.attr<double>(_Unicode(sipm_window_gap));
+  //const double sipm_win_gap       = dims.attr<double>(_Unicode(sipm_window_gap));
 
   // S:C ratio (integer attributes on the <detector> element)
   const int sc_ratio_S = detElem.attr<int>(_Unicode(sc_ratio_S));
   const int sc_ratio_C = detElem.attr<int>(_Unicode(sc_ratio_C));
   const int sc_period  = sc_ratio_S + sc_ratio_C; // period length
+
+  // Optional placement offset for tiled modules.  Unset attributes preserve
+  // the original single-module placement at the world origin.
+  const double module_x0 = detElem.hasAttr(_Unicode(x0)) ? detElem.attr<double>(_Unicode(x0)) : 0.0;
+  const double module_y0 = detElem.hasAttr(_Unicode(y0)) ? detElem.attr<double>(_Unicode(y0)) : 0.0;
+  const double module_z0 = detElem.hasAttr(_Unicode(z0)) ? detElem.attr<double>(_Unicode(z0)) : 0.0;
 
   // -------------------------------------------------------------------------
   // Read sensor surface parameters from <sensors><sipm> child
@@ -123,7 +132,15 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   const double fiber_od_half     = fiber_od / 2.0;                 // 0.500 mm
   const double clad_thickness    = 0.015 * dd4hep::mm;             // 15 um
   const double core_radius       = fiber_od_half - clad_thickness; // 0.485 mm
-  const double fiber_half_length = module_dz / 2.0;                // 500 mm
+  // Shorten fiber half-length so SiPM windows (one per end) fit inside pbVol.
+  // Full absorber half-depth = module_dz/2.  Reserve sipm_win_thickness + 2*epsilon
+  // on each end: one epsilon between fiber end face and window inner face,
+  // and one epsilon between window outer face and pbVol boundary.
+  // Algebraic budget per end: epsilon_inner + t_win + epsilon_outer = 2*epsilon + t_win.
+  //const double win_epsilon       = 0.001 * dd4hep::mm;             // 1 µm anti-overlap gap
+  const double fiber_half_length = module_dz / 2.0
+                                   - sipm_win_thickness;
+  //                                 - 2.0 * win_epsilon;            // shortened
 
   // -------------------------------------------------------------------------
   // Lattice dimensions
@@ -138,6 +155,20 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
     if ((fi % sc_period) < sc_ratio_S) ++N_S;
     else                                ++N_C;
   }
+
+  // Read visualization attributes from XML.
+  // Fallback names keep the code robust if the XML attributes are missing.
+  std::string visAbsName  = detElem.attr<std::string>(_Unicode(vis_absorber));
+  std::string visSName    = detElem.attr<std::string>(_Unicode(vis_s_fiber));
+  std::string visCName    = detElem.attr<std::string>(_Unicode(vis_c_fiber));
+  std::string visCladName = detElem.attr<std::string>(_Unicode(vis_cladding));
+  std::string visSiPMName = detElem.attr<std::string>(_Unicode(vis_sipm));
+
+  auto visAbs  = desc.visAttributes(visAbsName);
+  auto visS    = desc.visAttributes(visSName);
+  auto visC    = desc.visAttributes(visCName);
+  auto visClad = desc.visAttributes(visCladName);
+  auto visSiPM = desc.visAttributes(visSiPMName);
 
   // -------------------------------------------------------------------------
   // Logging (INFO level)
@@ -160,15 +191,16 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   // -------------------------------------------------------------------------
   // Materials
   // -------------------------------------------------------------------------
-  Material lead_mat = desc.material("DR_Lead");
-  Material S_mat    = desc.material("DR_Polystyrene");
-  Material C_mat    = desc.material("DR_PMMA");
-  Material clad_mat = desc.material("DR_FluorinatedPolymer");
+  Material lead_mat    = desc.material("DR_Lead");
+  Material S_mat       = desc.material("DR_Polystyrene");
+  Material C_mat       = desc.material("DR_PMMA");
+  Material clad_S_mat  = desc.material("DR_PMMA");               // SCSF-78: PS core / PMMA clad, NA=0.55
+  Material clad_C_mat  = desc.material("DR_FluorinatedPolymer"); // SK-40:   PMMA core / FP clad, NA=0.50
 
   // -------------------------------------------------------------------------
   // Detector envelope: outer Assembly (no intrinsic boundary constraint).
-  // This allows SiPM windows to sit just outside the Pb absorber block in z
-  // without causing a "volume outside boundary" TGeo error.
+  // Contains only the Pb absorber block; fibers and windows are all placed
+  // inside pbVol via fiberAsm.
   // Pattern: BarrelCalorimeterScFi_geo.cpp:81 (envelope is an Assembly).
   // -------------------------------------------------------------------------
   Assembly envelope(detName);
@@ -180,6 +212,9 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   // fiber calorimeters.
   Box    pbBox(module_dx / 2.0, module_dy / 2.0, module_dz / 2.0);
   Volume pbVol(detName + "_absorber", pbBox, lead_mat);
+
+  // Pb/module absorber volume
+  pbVol.setVisAttributes(visAbs);
 
   // -------------------------------------------------------------------------
   // Fiber volumes
@@ -195,21 +230,45 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   // the cladding material in the core region, preserving the correct n(core)>n(clad)
   // optical boundary at the core/clad interface.
   //
-  // TIR check: n(clad)=1.42 < n(PS)=1.57-1.69 and n(PMMA)=1.48-1.53 (plan R16).
+  // TIR check per fiber type (plan R16, Kuraray datasheet):
+  //   S-fiber (SCSF-78 single-clad): PS core n=1.574-1.692 / PMMA clad n=1.483-1.531
+  //     -> n(core) > n(clad) everywhere, NA=0.55, trapping ~3.1% per end
+  //   C-fiber (SK-40 single-clad):   PMMA core n=1.483-1.531 / FluorinatedPolymer clad n=1.42
+  //     -> n(core) > n(clad) everywhere, NA=0.50, trapping ~2.8% per end
   // -------------------------------------------------------------------------
+  // Shared cladding tube shape (same outer radius for both fiber types)
   Tube clad_tube(0.0, fiber_od_half, fiber_half_length); // SOLID cladding tube
 
-  // S fiber: cladding (FluorinatedPolymer) with Polystyrene core inside
+  // S-fiber: SCSF-78 single-clad — PS core / PMMA cladding
+  // Core: DR_Polystyrene (n=1.59), Cladding: DR_PMMA (n=1.49), NA=0.55
   Tube   core_tube_S(0.0, core_radius, fiber_half_length);
   Volume core_vol_S(detName + "_fiber_core_S", core_tube_S, S_mat);
-  Volume clad_vol_S(detName + "_fiber_S", clad_tube, clad_mat);
+  Volume clad_vol_S(detName + "_fiber_S", clad_tube, clad_S_mat);
   clad_vol_S.placeVolume(core_vol_S, Position(0, 0, 0));
 
-  // C fiber: cladding (FluorinatedPolymer) with PMMA core inside
+  // C-fiber: SK-40 single-clad — PMMA core / FluorinatedPolymer cladding
+  // Core: DR_PMMA (n=1.49), Cladding: DR_FluorinatedPolymer (n=1.42), NA=0.50
   Tube   core_tube_C(0.0, core_radius, fiber_half_length);
   Volume core_vol_C(detName + "_fiber_core_C", core_tube_C, C_mat);
-  Volume clad_vol_C(detName + "_fiber_C", clad_tube, clad_mat);
+  Volume clad_vol_C(detName + "_fiber_C", clad_tube, clad_C_mat);
   clad_vol_C.placeVolume(core_vol_C, Position(0, 0, 0));
+
+  // Mark only fiber cores and claddings for DDG4's post-conversion fast region.
+  // Sensitive end windows intentionally remain outside this region.
+  Region fastFiberRegion(detName + "FastFiberRegion");
+  desc.add(fastFiberRegion);
+  core_vol_S.setRegion(fastFiberRegion);
+  core_vol_C.setRegion(fastFiberRegion);
+  clad_vol_S.setRegion(fastFiberRegion);
+  clad_vol_C.setRegion(fastFiberRegion);
+
+  // Fiber volumes
+  core_vol_S.setVisAttributes(visS);
+  core_vol_C.setVisAttributes(visC);
+
+  // Cladding, if you have a separate cladding volume
+  clad_vol_C.setVisAttributes(visClad);
+  clad_vol_S.setVisAttributes(visClad);
 
   // -------------------------------------------------------------------------
   // SiPM window volumes
@@ -231,20 +290,18 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   sipm_win_vol_S.setSensitiveDetector(sens);
   sipm_win_vol_C.setSensitiveDetector(sens);
 
+  // SiPM/scoring windows
+  sipm_win_vol_S.setVisAttributes(visSiPM);
+  sipm_win_vol_C.setVisAttributes(visSiPM);
+
   // -------------------------------------------------------------------------
   // Assembly voxelization (REQUIRED, plan R17)
   // Grid: ~20x20 mm cells, following BarrelCalorimeterScFi_geo.cpp:245-284.
   //
-  // Two separate sets of grid assemblies per grid cell:
-  //   fiberAsm: placed INSIDE pbVol (fibers are daughters of Pb absorber).
-  //   winAsm:   placed in the OUTER envelope (windows extend beyond Pb in z).
-  //
-  // The fiber assembly centroid is placed at (gx_cen, gy_cen, 0) relative to
-  // pbVol center (which is at 0,0,0 in the absorber's own frame).
-  // The window assembly centroid is placed at (gx_cen, gy_cen, 0) in the outer
-  // envelope frame (same x,y; z=0 because window z-offsets are absolute from
-  // the module center and are already encoded in win_z_end0/1 relative to the
-  // grid assembly local origin at z=0).
+  // One fiberAsm per grid cell, placed INSIDE pbVol at (gx_cen, gy_cen, 0).
+  // Each fiberAsm contains both the fiber tubes (at z=0) and the SiPM window
+  // disks at each end (at ±win_z_end).  All volumes stay within pbVol because
+  // fiber_half_length has been shortened to leave room for the windows.
   // -------------------------------------------------------------------------
   const double grid_size = 20.0 * dd4hep::mm; // ~20x20 mm grid cells
   const int grid_nx = std::max(1, static_cast<int>(std::ceil(module_dx / grid_size)));
@@ -258,14 +315,18 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   const double x0 = -module_dx / 2.0 + fiber_pitch_x / 2.0;
   const double y0 = -module_dy / 2.0 + fiber_pitch_y / 2.0;
 
-  // SiPM window z-positions (relative to module center at z=0, i.e. in the
-  // outer envelope / pbVol frame — pbVol is at (0,0,0) in the envelope):
-  //   End 0 (-z): z = -(fiber_half_length + sipm_win_gap + sipm_win_thickness/2)
-  //   End 1 (+z): z = +(fiber_half_length + sipm_win_gap + sipm_win_thickness/2)
-  // These are OUTSIDE the absorber (which ends at ±fiber_half_length = ±500 mm),
-  // so they must go in the outer envelope assembly, not inside pbVol.
-  const double win_z_end0 = -(fiber_half_length + sipm_win_gap + sipm_win_thickness / 2.0);
-  const double win_z_end1 = +(fiber_half_length + sipm_win_gap + sipm_win_thickness / 2.0);
+  // SiPM window z-positions relative to the fiber grid assembly local origin (z=0).
+  // Fiber tube occupies [-fiber_half_length, +fiber_half_length].
+  // Budget per end (from pbVol boundary inward):
+  //   [pbVol face] -- epsilon_outer -- [window outer face] -- t_win -- [window inner face]
+  //   -- epsilon_inner -- [fiber end face]
+  // => window centre at ±(fiber_half_length + win_epsilon + sipm_win_thickness/2)
+  // => window outer face at ±(fiber_half_length + win_epsilon + sipm_win_thickness)
+  //    = ±(module_dz/2 - win_epsilon)  [strictly inside pbVol by win_epsilon]
+  const double win_z_end0 = -(fiber_half_length + sipm_win_thickness / 2.0);
+  const double win_z_end1 = +(fiber_half_length + sipm_win_thickness / 2.0);
+  //const double win_z_end0 = -(fiber_half_length + win_epsilon + sipm_win_thickness / 2.0);
+  //const double win_z_end1 = +(fiber_half_length + win_epsilon + sipm_win_thickness / 2.0);
 
   // -------------------------------------------------------------------------
   // Build grid assemblies and place fibers (inside pbVol) + windows (in envelope)
@@ -284,12 +345,10 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
       const std::string cellTag = std::to_string(gix) + "_" + std::to_string(giy);
 
       // Fiber sub-assembly: placed inside pbVol at (gx_cen, gy_cen, 0).
-      // Contains only fiber volumes (z in [-500, +500] mm — fully inside Pb).
+      // Contains fiber volumes AND both SiPM end windows per fiber.
+      // All volumes (fibers + windows) fit within pbVol because fiber_half_length
+      // has been shortened to leave room for the window disks at each end.
       Assembly fiberAsm(detName + "_fiberGrid_" + cellTag);
-
-      // Window sub-assembly: placed in outer envelope at (gx_cen, gy_cen, 0).
-      // Contains only SiPM window volumes (at z = ±500.1 mm — outside Pb face).
-      Assembly winAsm(detName + "_winGrid_" + cellTag);
 
       bool cell_has_fibers = false;
 
@@ -321,18 +380,19 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
           Volume& fiberVol = is_S ? clad_vol_S : clad_vol_C;
           fiberAsm.placeVolume(fiberVol, Position(rel_x, rel_y, 0.0));
 
-          // Place SiPM windows in window assembly (goes in outer envelope)
+          // Place SiPM windows in the SAME fiber assembly (inside pbVol).
+          // Windows are flush at each fiber end face, separated by win_epsilon.
           Volume& winVol = is_S ? sipm_win_vol_S : sipm_win_vol_C;
 
           // End 0: -z face (end = 0)
-          PlacedVolume win_pv0 = winAsm.placeVolume(
+          PlacedVolume win_pv0 = fiberAsm.placeVolume(
               winVol, Position(rel_x, rel_y, win_z_end0));
           win_pv0.addPhysVolID("fiber",   fiber_idx);
           win_pv0.addPhysVolID("end",     0);
           win_pv0.addPhysVolID("channel", channel_id);
 
           // End 1: +z face (end = 1)
-          PlacedVolume win_pv1 = winAsm.placeVolume(
+          PlacedVolume win_pv1 = fiberAsm.placeVolume(
               winVol, Position(rel_x, rel_y, win_z_end1));
           win_pv1.addPhysVolID("fiber",   fiber_idx);
           win_pv1.addPhysVolID("end",     1);
@@ -344,25 +404,19 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
       } // end iy
 
       if (cell_has_fibers) {
-        // Voxelize both assemblies before placement.
+        // Voxelize the fiber+window assembly before placement.
         fiberAsm.ptr()->Voxelize("");
-        winAsm.ptr()->Voxelize("");
 
-        // Place fiber assembly INSIDE the Pb absorber volume.
+        // Place the combined fiber+window assembly INSIDE the Pb absorber volume.
         // gx_cen, gy_cen are already in pbVol-centered coordinates.
         pbVol.placeVolume(fiberAsm, Position(gx_cen, gy_cen, 0.0));
-
-        // Place window assembly in the OUTER envelope.
-        // Windows sit at ±500.15 mm in z, outside pbVol's ±500 mm extent.
-        envelope.placeVolume(winAsm, Position(gx_cen, gy_cen, 0.0));
       }
 
     } // end gix
   } // end giy
 
   // Place the Pb absorber block in the outer envelope at z=0.
-  // All fibers are now daughters of pbVol; the outer envelope also contains
-  // the SiPM window assemblies (at ±z outside the absorber face).
+  // All fibers and SiPM windows are daughters of pbVol via fiberAsm.
   envelope.placeVolume(pbVol, Position(0, 0, 0));
 
   // -------------------------------------------------------------------------
@@ -389,14 +443,14 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   // Place detector envelope in the mother volume (world)
   // -------------------------------------------------------------------------
   Volume motherVol    = desc.pickMotherVolume(det);
-  PlacedVolume env_pv = motherVol.placeVolume(envelope, Position(0, 0, 0));
+  PlacedVolume env_pv = motherVol.placeVolume(envelope, Position(module_x0, module_y0, module_z0));
   env_pv.addPhysVolID("system", detID);
   det.setPlacement(env_pv);
 
   printout(INFO, "DRPrototype_geo",
            "DRPrototype constructed: N_fibers=%d, N_windows=%d, grid=%dx%d assemblies",
            N_total, 2 * N_total, grid_nx, grid_ny);
-
+  printout(INFO, "DRPrototype_geo", "USING NEW DEBUG GEOMETRY v1: optical Surface in");
   return det;
 }
 

@@ -54,8 +54,8 @@
     <constant name="DR_fiber_pitch_y"          value="1.22*mm"/>   <!-- radial (row) pitch -->
 
     <!-- SiPM window geometry -->
-    <constant name="DR_sipm_window_thickness"  value="0.1*mm"/>    <!-- thin scoring window -->
-    <constant name="DR_sipm_window_gap"        value="0.05*mm"/>   <!-- air gap between fiber end and window -->
+    <constant name="DR_sipm_window_thickness"  value="1*mm"/>    <!-- thin scoring window -->
+    <!-- <constant name="DR_sipm_window_gap"        value="0.05*mm"/>   air gap between fiber end and window -->
 
     <!-- Default S:C ratio (4:1, middle rung).
          Top-level ratio-variant compacts pass different values as attributes
@@ -83,7 +83,6 @@
         SiPM windows: thin AirOptical box at each fiber end (±z), sensitive.
 
       SD architecture (plan design principle):
-        sens.setType("tracker") -> Geant4TrackerAction -> one SimTrackerHit per detected photon.
         DR_SiPMSurf SkinSurface on each window volume -> EFFICIENCY table governs detection.
         1 hit = 1 detected photoelectron. No analysis-time PDE weight.
 
@@ -98,7 +97,13 @@
       readout="DRPrototypeHits"
       sc_ratio_S="4"
       sc_ratio_C="1"
+      vis_absorber="DR_PbAbsorberVis"
+      vis_s_fiber="DR_ScintFiberVis"
+      vis_c_fiber="DR_CherFiberVis"
+      vis_cladding="DR_FiberCladdingVis"
+      vis_sipm="DR_SiPMWindowVis"
       calorimeterType="EM"
+      >
       >
       <!-- Geometry parameters (plugin reads these from <dimensions> child) -->
       <dimensions
@@ -109,7 +114,6 @@
         fiber_pitch_x="DR_fiber_pitch_x"
         fiber_pitch_y="DR_fiber_pitch_y"
         sipm_window_thickness="DR_sipm_window_thickness"
-        sipm_window_gap="DR_sipm_window_gap"
         />
       <!-- SiPM window material and surface -->
       <sensors>
@@ -118,7 +122,7 @@
           surface="DR_SiPMSurf"
           />
       </sensors>
-    </detector>
+    </detector> 
   </detectors>
 
   <readouts>
@@ -144,5 +148,60 @@
       <id>system:8,fiber:16,end:1,channel:1</id>
     </readout>
   </readouts>
+
+    <display>
+    <!-- Envelope / absorber: transparent so fibers inside are visible -->
+    <vis name="DR_PbAbsorberVis"
+         r="0.45" g="0.47" b="0.50"
+         alpha="0.22"
+         drawingStyle="solid"
+         showDaughters="true"
+         visible="true"/>
+
+    <!-- Optional module envelope, if separate from Pb absorber -->
+    <vis name="DR_ModuleEnvelopeVis"
+         r="0.70" g="0.72" b="0.75"
+         alpha="0.12"
+         drawingStyle="solid"
+         showDaughters="true"
+         visible="true"/>
+
+    <!-- Scintillating fibers: warm/high-contrast -->
+    <vis name="DR_ScintFiberVis"
+         r="1.00" g="0.72" b="0.05"
+         alpha="0.95"
+         drawingStyle="solid"
+         showDaughters="true"
+         visible="true"/>
+
+    <!-- Cherenkov fibers: blue/cyan -->
+    <vis name="DR_CherFiberVis"
+         r="0.00" g="0.55" b="1.00"
+         alpha="0.95"
+         drawingStyle="solid"
+         showDaughters="true"
+         visible="true"/>
+
+    <!-- Fiber cladding: keep subtle, otherwise it clutters the view -->
+    <vis name="DR_FiberCladdingVis"
+         r="0.85" g="0.90" b="0.95"
+         alpha="0.18"
+         drawingStyle="solid"
+         showDaughters="true"
+         visible="true"/>
+
+    <!-- SiPM windows: thin colored transparent sheets at both ends -->
+    <vis name="DR_SiPMWindowVis"
+         r="0.85" g="0.15" b="1.00"
+         alpha="0.45"
+         drawingStyle="solid"
+         showDaughters="true"
+         visible="true"/>
+
+    <!-- Useful if you want to hide some helper volumes -->
+    <vis name="DR_InvisibleVis"
+         visible="false"
+         showDaughters="true"/>
+  </display>
 
 </lccdd>
