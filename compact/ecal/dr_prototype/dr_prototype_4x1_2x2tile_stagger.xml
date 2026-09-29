@@ -1,0 +1,58 @@
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!--
+  2x2-tiled 4-module DR dual-readout prototype variant — STAGGERED fiber lattice.
+  Mirrors dr_prototype_4x1_2x2tile.xml exactly; only fiber_stagger="true" differs.
+  Each 200x200mm module: ~24,043 fibers (82 rows x 148 + 81 rows x 147),
+  below the 65,536 capacity of the 16-bit fiber CellID field.
+  Physics purpose: test whether staggered hex-like packing explains the
+  residual +10% light-yield discrepancy vs. the collaborator's reference detector.
+-->
+<lccdd>
+  <define>
+    <constant name="DR_module_dx" value="200.0*mm"/>
+    <constant name="DR_module_dy" value="200.0*mm"/>
+    <constant name="DR_module_dz" value="1000.0*mm"/>
+    <constant name="DR_fiber_od" value="1.0*mm"/>
+    <constant name="DR_fiber_pitch_x" value="1.35*mm"/>
+    <constant name="DR_fiber_pitch_y" value="1.22*mm"/>
+    <constant name="DR_sipm_window_thickness" value="1*mm"/>
+    <constant name="DR_sc_ratio_S" value="4"/>
+    <constant name="DR_sc_ratio_C" value="1"/>
+    <constant name="DRPrototype_0_ID" value="200"/>
+    <constant name="DRPrototype_1_ID" value="201"/>
+    <constant name="DRPrototype_2_ID" value="202"/>
+    <constant name="DRPrototype_3_ID" value="203"/>
+  </define>
+  <detectors>
+    <detector id="DRPrototype_0_ID" name="DRPrototype_0" type="epic_DRPrototype" readout="DRPrototypeHits" x0="-100*mm" y0="-100*mm" sc_ratio_S="4" sc_ratio_C="1" vis_absorber="DR_PbAbsorberVis" vis_s_fiber="DR_ScintFiberVis" vis_c_fiber="DR_CherFiberVis" vis_cladding="DR_FiberCladdingVis" vis_sipm="DR_SiPMWindowVis" calorimeterType="EM">
+      <dimensions dx="DR_module_dx" dy="DR_module_dy" dz="DR_module_dz" fiber_od="DR_fiber_od" fiber_pitch_x="DR_fiber_pitch_x" fiber_pitch_y="DR_fiber_pitch_y" sipm_window_thickness="DR_sipm_window_thickness" fiber_stagger="true"/>
+      <sensors><sipm material="AirOptical" surface="DR_SiPMSurf"/></sensors>
+    </detector>
+    <detector id="DRPrototype_1_ID" name="DRPrototype_1" type="epic_DRPrototype" readout="DRPrototypeHits" x0="-100*mm" y0="100*mm" sc_ratio_S="4" sc_ratio_C="1" vis_absorber="DR_PbAbsorberVis" vis_s_fiber="DR_ScintFiberVis" vis_c_fiber="DR_CherFiberVis" vis_cladding="DR_FiberCladdingVis" vis_sipm="DR_SiPMWindowVis" calorimeterType="EM">
+      <dimensions dx="DR_module_dx" dy="DR_module_dy" dz="DR_module_dz" fiber_od="DR_fiber_od" fiber_pitch_x="DR_fiber_pitch_x" fiber_pitch_y="DR_fiber_pitch_y" sipm_window_thickness="DR_sipm_window_thickness" fiber_stagger="true"/>
+      <sensors><sipm material="AirOptical" surface="DR_SiPMSurf"/></sensors>
+    </detector>
+    <detector id="DRPrototype_2_ID" name="DRPrototype_2" type="epic_DRPrototype" readout="DRPrototypeHits" x0="100*mm" y0="-100*mm" sc_ratio_S="4" sc_ratio_C="1" vis_absorber="DR_PbAbsorberVis" vis_s_fiber="DR_ScintFiberVis" vis_c_fiber="DR_CherFiberVis" vis_cladding="DR_FiberCladdingVis" vis_sipm="DR_SiPMWindowVis" calorimeterType="EM">
+      <dimensions dx="DR_module_dx" dy="DR_module_dy" dz="DR_module_dz" fiber_od="DR_fiber_od" fiber_pitch_x="DR_fiber_pitch_x" fiber_pitch_y="DR_fiber_pitch_y" sipm_window_thickness="DR_sipm_window_thickness" fiber_stagger="true"/>
+      <sensors><sipm material="AirOptical" surface="DR_SiPMSurf"/></sensors>
+    </detector>
+    <detector id="DRPrototype_3_ID" name="DRPrototype_3" type="epic_DRPrototype" readout="DRPrototypeHits" x0="100*mm" y0="100*mm" sc_ratio_S="4" sc_ratio_C="1" vis_absorber="DR_PbAbsorberVis" vis_s_fiber="DR_ScintFiberVis" vis_c_fiber="DR_CherFiberVis" vis_cladding="DR_FiberCladdingVis" vis_sipm="DR_SiPMWindowVis" calorimeterType="EM">
+      <dimensions dx="DR_module_dx" dy="DR_module_dy" dz="DR_module_dz" fiber_od="DR_fiber_od" fiber_pitch_x="DR_fiber_pitch_x" fiber_pitch_y="DR_fiber_pitch_y" sipm_window_thickness="DR_sipm_window_thickness" fiber_stagger="true"/>
+      <sensors><sipm material="AirOptical" surface="DR_SiPMSurf"/></sensors>
+    </detector>
+  </detectors>
+  <readouts>
+    <readout name="DRPrototypeHits">
+      <id>system:8,fiber:16,end:1,channel:1</id>
+    </readout>
+  </readouts>
+  <display>
+    <vis name="DR_PbAbsorberVis" r="0.45" g="0.47" b="0.50" alpha="0.22" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_ModuleEnvelopeVis" r="0.70" g="0.72" b="0.75" alpha="0.12" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_ScintFiberVis" r="1.00" g="0.72" b="0.05" alpha="0.95" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_CherFiberVis" r="0.00" g="0.55" b="1.00" alpha="0.95" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_FiberCladdingVis" r="0.85" g="0.90" b="0.95" alpha="0.18" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_SiPMWindowVis" r="0.85" g="0.15" b="1.00" alpha="0.45" drawingStyle="solid" showDaughters="true" visible="true"/>
+    <vis name="DR_InvisibleVis" visible="false" showDaughters="true"/>
+  </display>
+</lccdd>

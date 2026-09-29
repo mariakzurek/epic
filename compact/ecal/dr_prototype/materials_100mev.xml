@@ -1,0 +1,699 @@
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!--
+  DR Prototype: Optical Materials and Surfaces
+  Source file  : /Users/zurek/eic-benchmarks-epic/DR/DRsimMaterials.cc (213 lines)
+  Date of port : 2026-07-05
+  Ported by    : code-editor (Phase 2 dispatch alpha, plan-dr-prototype.md section 2a)
+
+  Open questions resolved at port time:
+
+  Q7 (Glass rename):
+      DRsimMaterials.cc lines 77-79 define "Glass" as: 91.533 % C + 8.467 % H
+      by mass, density 1.032 g/cm3, RINDEX=1.52 flat, ABSLENGTH=420 cm flat.
+      This is NOT silicate glass (no Si, no O); it is a polystyrene-like hydrocarbon.
+      It is NOT the fiber cladding (FluorinatedPolymer fills that role).
+      With RINDEX=1.52 and this density it is consistent with a lightguide or
+      cookie material.  Decision: renamed to DR_LightguideMedium.
+      See per-material comment below for rationale.
+
+  Q9 (FilterSurf treatment):
+      DRsimMaterials.cc lines 189-203 define FilterSurf (long-pass yellow filter).
+      Ported below as DR_FilterSurf; NOT bound to any volume in this dispatch.
+      Binding is deferred to Phase 3 as a diagnostic tool (plan decision 10).
+
+  Unused entries (ported, not placed in default geometry):
+    DR_LightguideMedium : hydrocarbon lightguide/cookie medium; no lightguide volumes in dual-ended readout.
+    DR_FilterBody       : gelatin filter substrate; no optical-filter volumes in default prototype.
+    DR_MirrorSurf       : 90% reflective mirror surface; dual-ended readout has no mirrored fiber ends.
+
+  FIXMEs in this file:
+    PMMA ABSLENGTH: two suspicious near-neighbor drops at bins [7] and [11]
+    preserved verbatim from source.  Flagged with FIXME comments near the matrix.
+    Cross-check against SK-40 datasheet if C-channel yield misses target.
+
+  Unit conventions:
+    Photon energies : eV   (matching epic/compact/optical_materials.xml convention)
+    Absorption lengths : use *m, *cm units (source uses Geant4 metres)
+    Birks constant : mm/MeV  (syntax confirmed against SciFiPb_Scintillator in
+                     epic/compact/materials.xml:495)
+    Scintillation yield : /MeV  (DD4hep expression evaluator; source: 10./keV = 10000/MeV)
+    Time constants : *ns
+    Density : g/cm3
+
+  The 25-point photon energy grid (DRsimMaterials.cc:107-111), 900 nm to 300 nm:
+    [0]  1.37760 eV (900nm)   [8]  1.77120 eV (700nm)  [16] 2.47968 eV (500nm)
+    [1]  1.41696 eV (875nm)   [9]  1.83680 eV (675nm)  [17] 2.61019 eV (475nm)
+    [2]  1.45864 eV (850nm)  [10]  1.90745 eV (650nm)  [18] 2.75520 eV (450nm)
+    [3]  1.50284 eV (825nm)  [11]  1.98375 eV (625nm)  [19] 2.91728 eV (425nm)
+    [4]  1.54980 eV (800nm)  [12]  2.06640 eV (600nm)  [20] 3.09960 eV (400nm)
+    [5]  1.59980 eV (775nm)  [13]  2.15625 eV (575nm)  [21] 3.30625 eV (375nm)
+    [6]  1.65312 eV (750nm)  [14]  2.25426 eV (550nm)  [22] 3.54241 eV (350nm)
+    [7]  1.71013 eV (725nm)  [15]  2.36160 eV (525nm)  [23] 3.81490 eV (325nm)
+                                                        [24] 4.13281 eV (300nm)
+-->
+
+<lccdd>
+
+  <!--
+    Named property matrices (declared once, referenced in material and surface blocks).
+    Convention: epic/compact/optical_materials.xml lines 6-17.
+  -->
+  <properties>
+
+    <!-- === DR_Polystyrene (SCSF-78 scintillating fiber core) ===
+         Ported from DRsimMaterials.cc:140-168
+    -->
+    <matrix name="RINDEX__DR_Polystyrene" coldim="2" values="
+      1.37760*eV  1.57483
+      1.41696*eV  1.57568
+      1.45864*eV  1.57644
+      1.50284*eV  1.57726
+      1.54980*eV  1.57817
+      1.59980*eV  1.57916
+      1.65312*eV  1.58026
+      1.71013*eV  1.58148
+      1.77120*eV  1.58284
+      1.83680*eV  1.58435
+      1.90745*eV  1.58605
+      1.98375*eV  1.58796
+      2.06640*eV  1.59013
+      2.15625*eV  1.59328
+      2.25426*eV  1.59621
+      2.36160*eV  1.59960
+      2.47968*eV  1.60251
+      2.61019*eV  1.60824
+      2.75520*eV  1.61229
+      2.91728*eV  1.62032
+      3.09960*eV  1.62858
+      3.30625*eV  1.63886
+      3.54241*eV  1.65191
+      3.81490*eV  1.66888
+      4.13281*eV  1.69165
+      "/>
+
+    <matrix name="ABSLENGTH__DR_Polystyrene" coldim="2" values="
+      1.37760*eV  2.714*m
+      1.41696*eV  3.102*m
+      1.45864*eV  3.619*m
+      1.50284*eV  4.343*m
+      1.54980*eV  5.791*m
+      1.59980*eV  7.896*m
+      1.65312*eV  4.343*m
+      1.71013*eV  7.896*m
+      1.77120*eV  5.429*m
+      1.83680*eV  36.19*m
+      1.90745*eV  17.37*m
+      1.98375*eV  36.19*m
+      2.06640*eV  5.429*m
+      2.15625*eV  28.95*m
+      2.25426*eV  21.71*m
+      2.36160*eV  14.48*m
+      2.47968*eV  12.41*m
+      2.61019*eV  8.686*m
+      2.75520*eV  7.238*m
+      2.91728*eV  1.200*m
+      3.09960*eV  0.200*m
+      3.30625*eV  0.500*m
+      3.54241*eV  0.200*m
+      3.81490*eV  0.100*m
+      4.13281*eV  0.100*m
+      "/>
+
+    <!-- Scintillation emission spectrum (SCSF-78 proxy).
+         Source: DRsimMaterials.cc:150-154 (scintFast_PS[25]).
+         Peak at bin [18] = 2.75520 eV (450 nm), matching SCSF-78 emission.
+         Relative emission spectrum (values need not sum to 1).
+         Property name: SCINTILLATIONCOMPONENT1 (Geant4 >= 10.7 convention),
+         following leadtungsten_optical in optical_materials.xml:1149-1163.
+         The source used FASTCOMPONENT (legacy name) via #ifdef G4_LATEST guard;
+         we use the newer name here for eic-shell Geant4 compatibility.
+    -->
+    <matrix name="SCINTILLATIONCOMPONENT1__DR_Polystyrene" coldim="2" values="
+      1.37760*eV  0.00
+      1.41696*eV  0.00
+      1.45864*eV  0.00
+      1.50284*eV  0.00
+      1.54980*eV  0.00
+      1.59980*eV  0.00
+      1.65312*eV  0.00
+      1.71013*eV  0.00
+      1.77120*eV  0.00
+      1.83680*eV  0.00
+      1.90745*eV  0.00
+      1.98375*eV  0.00
+      2.06640*eV  0.00
+      2.15625*eV  0.03
+      2.25426*eV  0.07
+      2.36160*eV  0.13
+      2.47968*eV  0.33
+      2.61019*eV  0.63
+      2.75520*eV  1.00
+      2.91728*eV  0.50
+      3.09960*eV  0.00
+      3.30625*eV  0.00
+      3.54241*eV  0.00
+      3.81490*eV  0.00
+      4.13281*eV  0.00
+      "/>
+
+    <!-- === DR_PMMA (Mitsubishi SK-40 Cherenkov fiber core proxy) ===
+         Ported from DRsimMaterials.cc:120-133
+    -->
+    <matrix name="RINDEX__DR_PMMA" coldim="2" values="
+      1.37760*eV  1.48329
+      1.41696*eV  1.48355
+      1.45864*eV  1.48392
+      1.50284*eV  1.48434
+      1.54980*eV  1.48467
+      1.59980*eV  1.48515
+      1.65312*eV  1.48569
+      1.71013*eV  1.48628
+      1.77120*eV  1.48677
+      1.83680*eV  1.48749
+      1.90745*eV  1.48831
+      1.98375*eV  1.48899
+      2.06640*eV  1.49000
+      2.15625*eV  1.49119
+      2.25426*eV  1.49219
+      2.36160*eV  1.49372
+      2.47968*eV  1.49552
+      2.61019*eV  1.49766
+      2.75520*eV  1.49953
+      2.91728*eV  1.50252
+      3.09960*eV  1.50519
+      3.30625*eV  1.51000
+      3.54241*eV  1.51518
+      3.81490*eV  1.52182
+      4.13281*eV  1.53055
+      "/>
+
+    <!--
+      PMMA ABSLENGTH verbatim from DRsimMaterials.cc:125-129.
+      Two suspicious near-neighbor drops preserved verbatim (plan decision 7, R7):
+        Bin [7]  at 1.71013 eV (725 nm): 1.448 m, between 4.343 m (750nm) and
+                                          4.343 m (700nm) - isolated drop.
+        Bin [11] at 1.98375 eV (625 nm): 8.686 m, between 21.71 m (650nm) and
+                                          28.95 m (600nm) - isolated drop.
+      FIXME: verify against SK-40 datasheet if C-channel yield misses target.
+      See research-DR-baseline.md section 7.5 and plan R7.
+    -->
+    <matrix name="ABSLENGTH__DR_PMMA" coldim="2" values="
+      1.37760*eV  0.414*m
+      1.41696*eV  0.543*m
+      1.45864*eV  0.965*m
+      1.50284*eV  2.171*m
+      1.54980*eV  2.171*m
+      1.59980*eV  3.341*m
+      1.65312*eV  4.343*m
+      1.71013*eV  1.448*m
+      1.77120*eV  4.343*m
+      1.83680*eV  14.48*m
+      1.90745*eV  21.71*m
+      1.98375*eV  8.686*m
+      2.06640*eV  28.95*m
+      2.15625*eV  54.29*m
+      2.25426*eV  43.43*m
+      2.36160*eV  48.25*m
+      2.47968*eV  54.29*m
+      2.61019*eV  48.25*m
+      2.75520*eV  43.43*m
+      2.91728*eV  28.95*m
+      3.09960*eV  21.71*m
+      3.30625*eV  4.343*m
+      3.54241*eV  2.171*m
+      3.81490*eV  0.869*m
+      4.13281*eV  0.434*m
+      "/>
+
+    <!-- === DR_FluorinatedPolymer (fiber outer cladding) ===
+         Ported from DRsimMaterials.cc:135-138
+         Flat RINDEX = 1.42 (25-point grid matching other tables).
+         TIR requirement (plan R16): n(cladding) strictly less than n(core) everywhere.
+           PS RINDEX range: 1.574 to 1.692  (all greater than 1.42, check passes)
+           PMMA RINDEX range: 1.483 to 1.531 (all greater than 1.42, check passes)
+         No ABSLENGTH in source (DRsimMaterials.cc section 3.8 note).
+    -->
+    <matrix name="RINDEX__DR_FluorinatedPolymer" coldim="2" values="
+      1.37760*eV  1.42
+      1.41696*eV  1.42
+      1.45864*eV  1.42
+      1.50284*eV  1.42
+      1.54980*eV  1.42
+      1.59980*eV  1.42
+      1.65312*eV  1.42
+      1.71013*eV  1.42
+      1.77120*eV  1.42
+      1.83680*eV  1.42
+      1.90745*eV  1.42
+      1.98375*eV  1.42
+      2.06640*eV  1.42
+      2.15625*eV  1.42
+      2.25426*eV  1.42
+      2.36160*eV  1.42
+      2.47968*eV  1.42
+      2.61019*eV  1.42
+      2.75520*eV  1.42
+      2.91728*eV  1.42
+      3.09960*eV  1.42
+      3.30625*eV  1.42
+      3.54241*eV  1.42
+      3.81490*eV  1.42
+      4.13281*eV  1.42
+      "/>
+
+    <!-- === DR_LightguideMedium (Q7 rename from source "Glass") ===
+         Ported from DRsimMaterials.cc:170-175
+         Flat RINDEX = 1.52, ABSLENGTH = 420 cm.
+    -->
+    <matrix name="RINDEX__DR_LightguideMedium" coldim="2" values="
+      1.37760*eV  1.52
+      1.41696*eV  1.52
+      1.45864*eV  1.52
+      1.50284*eV  1.52
+      1.54980*eV  1.52
+      1.59980*eV  1.52
+      1.65312*eV  1.52
+      1.71013*eV  1.52
+      1.77120*eV  1.52
+      1.83680*eV  1.52
+      1.90745*eV  1.52
+      1.98375*eV  1.52
+      2.06640*eV  1.52
+      2.15625*eV  1.52
+      2.25426*eV  1.52
+      2.36160*eV  1.52
+      2.47968*eV  1.52
+      2.61019*eV  1.52
+      2.75520*eV  1.52
+      2.91728*eV  1.52
+      3.09960*eV  1.52
+      3.30625*eV  1.52
+      3.54241*eV  1.52
+      3.81490*eV  1.52
+      4.13281*eV  1.52
+      "/>
+
+    <matrix name="ABSLENGTH__DR_LightguideMedium" coldim="2" values="
+      1.37760*eV  420.0*cm
+      1.41696*eV  420.0*cm
+      1.45864*eV  420.0*cm
+      1.50284*eV  420.0*cm
+      1.54980*eV  420.0*cm
+      1.59980*eV  420.0*cm
+      1.65312*eV  420.0*cm
+      1.71013*eV  420.0*cm
+      1.77120*eV  420.0*cm
+      1.83680*eV  420.0*cm
+      1.90745*eV  420.0*cm
+      1.98375*eV  420.0*cm
+      2.06640*eV  420.0*cm
+      2.15625*eV  420.0*cm
+      2.25426*eV  420.0*cm
+      2.36160*eV  420.0*cm
+      2.47968*eV  420.0*cm
+      2.61019*eV  420.0*cm
+      2.75520*eV  420.0*cm
+      2.91728*eV  420.0*cm
+      3.09960*eV  420.0*cm
+      3.30625*eV  420.0*cm
+      3.54241*eV  420.0*cm
+      3.81490*eV  420.0*cm
+      4.13281*eV  420.0*cm
+      "/>
+
+    <!-- === DR_FilterBody (Gelatin, filter body RINDEX) ===
+         Ported from DRsimMaterials.cc:195-198
+         RINDEX = 1.52 flat (2-point table sufficient for a constant).
+    -->
+    <matrix name="RINDEX__DR_FilterBody" coldim="2" values="
+      1.37760*eV  1.52
+      4.13281*eV  1.52
+      "/>
+
+    <!-- === SiPM PDE: Hamamatsu S13615-1025N MPPC ===
+         Ported from DRsimMaterials.cc:178-185.
+         Source lines: eff_SiPM[25] (lines 178-182), refl_SiPM filled to 0 (line 177).
+         Peak PDE = 0.21 (21%) at 500-350 nm (bins 20-22, energies 3.10-3.54 eV).
+    -->
+    <matrix name="EFFICIENCY__DR_SiPMSurf" coldim="2" values="
+      1.37760*eV  0.00
+      1.41696*eV  0.00
+      1.45864*eV  0.00
+      1.50284*eV  0.00
+      1.54980*eV  0.00
+      1.59980*eV  0.00
+      1.65312*eV  0.00
+      1.71013*eV  0.00
+      1.77120*eV  0.00
+      1.83680*eV  0.00
+      1.90745*eV  0.00
+      1.98375*eV  0.00
+      2.06640*eV  0.01
+      2.15625*eV  0.02
+      2.25426*eV  0.03
+      2.36160*eV  0.07
+      2.47968*eV  0.11
+      2.61019*eV  0.13
+      2.75520*eV  0.17
+      2.91728*eV  0.19
+      3.09960*eV  0.21
+      3.30625*eV  0.21
+      3.54241*eV  0.21
+      3.81490*eV  0.20
+      4.13281*eV  0.19
+      "/>
+
+    <!-- <matrix name="EFFICIENCY__DR_SiPMSurf" coldim="2" values="
+      1.37760*eV  1.00
+      1.41696*eV  1.00
+      1.45864*eV  1.00
+      1.50284*eV  1.00
+      1.54980*eV  1.00
+      1.59980*eV  1.00
+      1.65312*eV  1.00
+      1.71013*eV  1.00
+      1.77120*eV  1.00
+      1.83680*eV  1.00
+      1.90745*eV  1.00
+      1.98375*eV  1.00
+      2.06640*eV  1.00
+      2.15625*eV  1.00
+      2.25426*eV  1.00
+      2.36160*eV  1.00
+      2.47968*eV  1.00
+      2.61019*eV  1.00
+      2.75520*eV  1.00
+      2.91728*eV  1.00
+      3.09960*eV  1.00
+      3.30625*eV  1.00
+      3.54241*eV  1.00
+      3.81490*eV  1.00
+      4.13281*eV  1.00
+      "/> -->
+
+    <!-- REFLECTIVITY = 0 everywhere for SiPM surface.
+         Source: DRsimMaterials.cc:177 std::fill_n(refl_SiPM, nEnt, 0.)
+         2-point flat table is sufficient for a constant value.
+    -->
+    <matrix name="REFLECTIVITY__DR_SiPMSurf" coldim="2" values="
+      1.37760*eV  0.0
+      4.13281*eV  0.0
+      "/>
+
+    <!-- === DR_FilterSurf: long-pass filter transmittance and reflectivity ===
+         Ported from DRsimMaterials.cc:189-203.
+         Passes lambda > ~500 nm (Cherenkov range), blocks lambda < ~420 nm
+         (rejects SCSF-78 blue scintillation peak at ~450 nm).
+         TRANSMITTANCE: DRsimMaterials.cc:189-193 (filterEff[25]).
+         REFLECTIVITY = 0 everywhere: DRsimMaterials.cc:194 (filterRef[25]).
+    -->
+    <matrix name="TRANSMITTANCE__DR_FilterSurf" coldim="2" values="
+      1.37760*eV  1.000
+      1.41696*eV  1.000
+      1.45864*eV  1.000
+      1.50284*eV  1.000
+      1.54980*eV  1.000
+      1.59980*eV  1.000
+      1.65312*eV  1.000
+      1.71013*eV  1.000
+      1.77120*eV  1.000
+      1.83680*eV  1.000
+      1.90745*eV  1.000
+      1.98375*eV  1.000
+      2.06640*eV  1.000
+      2.15625*eV  1.000
+      2.25426*eV  0.900
+      2.36160*eV  0.734
+      2.47968*eV  0.568
+      2.61019*eV  0.402
+      2.75520*eV  0.296
+      2.91728*eV  0.070
+      3.09960*eV  0.000
+      3.30625*eV  0.000
+      3.54241*eV  0.000
+      3.81490*eV  0.000
+      4.13281*eV  0.000
+      "/>
+
+    <matrix name="REFLECTIVITY__DR_FilterSurf" coldim="2" values="
+      1.37760*eV  0.0
+      4.13281*eV  0.0
+      "/>
+
+    <!-- === DR_MirrorSurf: generic 90% mirror ===
+         Ported from DRsimMaterials.cc:205-212 (fMirrorSurf).
+         REFLECTIVITY = 0.9 flat, TRANSMITTANCE = 0.0 flat.
+    -->
+    <matrix name="REFLECTIVITY__DR_MirrorSurf" coldim="2" values="
+      1.37760*eV  0.9
+      4.13281*eV  0.9
+      "/>
+
+    <matrix name="TRANSMITTANCE__DR_MirrorSurf" coldim="2" values="
+      1.37760*eV  0.0
+      4.13281*eV  0.0
+      "/>
+
+  </properties>
+
+  <!--
+    Material definitions.
+    All prefixed DR_ to avoid name clashes with epic/compact/materials.xml and
+    epic/compact/optical_materials.xml (plan R3).
+    Elements (H, C, N, O, F, Pb) are resolved from the NIST/DD4hep base element
+    table loaded by the top-level compact (via elements.xml or equivalent).
+  -->
+  <materials>
+
+    <!-- DR_Lead: Pb absorber matrix
+         Ported from DRsimMaterials.cc:65 (fPb).
+         Pure elemental lead, density 11.35 g/cm3.
+         No optical properties: opaque matrix. Photons reaching the Pb boundary
+         from a fiber core are handled by the fiber outer-skin surface (plugin, P2-beta).
+         Note: epic already defines "Pb"; DR_Lead is an isolated copy to avoid
+         any future property contamination from changes to the epic base entry.
+    -->
+    <material name="DR_Lead">
+      <!-- Ported from DRsimMaterials.cc:65 -->
+      <D type="density" value="11.35" unit="g/cm3"/>
+      <composite n="1" ref="Pb"/>
+    </material>
+
+    <!-- DR_Polystyrene: SCSF-78 scintillating fiber core (S-channel)
+         Ported from DRsimMaterials.cc:81-83 (composition) and 140-168 (optical).
+         Composition: C8H8, density 1.05 g/cm3.
+
+         Birks constant syntax: <constant name="BirksConstant" value="0.126*mm/MeV"/>
+         Confirmed against epic/compact/materials.xml:495 (SciFiPb_Scintillator),
+         which reads: <constant name="BirksConstant" value="0.126*mm/MeV"/>
+         Units: mm/MeV.  Source: DRsimMaterials.cc:168 (0.126*mm/MeV).
+         This satisfies plan R10 Birks sub-check.
+
+         SCINTILLATIONYIELD: source line 158 = 10./keV = 10000 photons/MeV.
+         DD4hep expression: value="100.0/MeV".
+
+         YIELDRATIO: source does not set this explicitly (only FASTCOMPONENT defined,
+         no SLOWCOMPONENT), meaning all light is in the fast component.
+         Not required in Geant4 >= 10.7 when only component 1 is defined; omitted.
+
+         Property naming: SCINTILLATIONYIELD1, SCINTILLATIONTIMECONSTANT1,
+         SCINTILLATIONCOMPONENT1 are the Geant4 >= 10.7 names (replacing
+         SCINTILLATIONYIELD, FASTTIMECONSTANT, FASTCOMPONENT).
+         Following leadtungsten_optical in optical_materials.xml:1149-1163.
+    -->
+    <material name="DR_Polystyrene">
+      <!-- Ported from DRsimMaterials.cc:81-168 -->
+      <D type="density" value="1.05" unit="g/cm3"/>
+      <composite n="8" ref="C"/>
+      <composite n="8" ref="H"/>
+      <property name="RINDEX"                    ref="RINDEX__DR_Polystyrene"/>
+      <property name="ABSLENGTH"                 ref="ABSLENGTH__DR_Polystyrene"/>
+      <property name="SCINTILLATIONCOMPONENT1"   ref="SCINTILLATIONCOMPONENT1__DR_Polystyrene"/>
+      <!-- Scintillation constants, following leadtungsten_optical idiom -->
+      <property name="SCINTILLATIONYIELD1"        value="100.0/MeV"/>
+      <property name="SCINTILLATIONTIMECONSTANT1" value="2.8*ns"/>
+      <property name="RESOLUTIONSCALE"            value="1.0"/>
+      <!-- Birks quenching constant.
+           Syntax: <constant name="BirksConstant" value="..."/> per
+           epic/compact/materials.xml:495 (SciFiPb_Scintillator).
+           Units: mm/MeV.  Source: DRsimMaterials.cc:168. -->
+      <constant name="BirksConstant" value="0.126*mm/MeV"/>
+    </material>
+
+    <!-- DR_PMMA: Mitsubishi SK-40 Cherenkov fiber core (C-channel)
+         Ported from DRsimMaterials.cc:85-88 (composition) and 120-133 (optical).
+         Composition: C5H8O2, density 1.19 g/cm3.
+         ABSLENGTH has two suspicious near-neighbor drops; see FIXME in matrix above.
+    -->
+    <material name="DR_PMMA">
+      <!-- Ported from DRsimMaterials.cc:85-133 -->
+      <D type="density" value="1.19" unit="g/cm3"/>
+      <composite n="5" ref="C"/>
+      <composite n="8" ref="H"/>
+      <composite n="2" ref="O"/>
+      <property name="RINDEX"    ref="RINDEX__DR_PMMA"/>
+      <property name="ABSLENGTH" ref="ABSLENGTH__DR_PMMA"/>
+    </material>
+
+    <!-- DR_FluorinatedPolymer: fiber outer cladding (TIR requirement)
+         Ported from DRsimMaterials.cc:73-75 (composition) and 135-138 (optical).
+         Composition: C2F2, density 1.43 g/cm3.
+         RINDEX = 1.42 flat, strictly below both PS (1.574-1.692) and PMMA
+         (1.483-1.531) at all 25 wavelength points: TIR verified (plan R16).
+           TIR critical angle for PS/FluoPoly:   arcsin(1.42/1.59) = 63.4 deg
+           TIR critical angle for PMMA/FluoPoly: arcsin(1.42/1.49) = 72.6 deg
+         No ABSLENGTH defined in source (DRsimMaterials.cc section 3.8 note).
+         Photons escaping the core into cladding travel unattenuated; in Geant4
+         they experience TIR at the core/clad boundary for the appropriate angles.
+    -->
+    <material name="DR_FluorinatedPolymer">
+      <!-- Ported from DRsimMaterials.cc:73-138 -->
+      <D type="density" value="1.43" unit="g/cm3"/>
+      <composite n="2" ref="C"/>
+      <composite n="2" ref="F"/>
+      <property name="RINDEX" ref="RINDEX__DR_FluorinatedPolymer"/>
+      <!-- No ABSLENGTH: source defines none for cladding (see section 3.8 note).
+           Photons in cladding travel with zero attenuation. -->
+    </material>
+
+    <!-- DR_LightguideMedium: lightguide or cookie material
+         Ported from DRsimMaterials.cc:77-79 (composition) and 170-175 (optical).
+
+         Q7 RESOLUTION: Source named this material "Glass" (DRsimMaterials.cc:77).
+         Actual composition: 91.533 % C + 8.467 % H by mass, density 1.032 g/cm3.
+         This is a hydrocarbon, NOT silicate glass (no Si, no O).
+         The source name "Glass" is misleading and a collision risk with real
+         glass materials (e.g. silicate) in the epic tree (plan R3, R7).
+         Based on RINDEX=1.52 and ABSLENGTH=420 cm this matches a clear lightguide
+         or optical-cookie medium.  Renamed to DR_LightguideMedium.
+
+         NOTE: Not used in the default DR_Prototype geometry.
+         Defined here for completeness of the port and potential future use
+         if lightguide volumes are added between fiber ends and SiPMs.
+    -->
+    <!-- UNUSED in default DR prototype geometry. Ported from source palette for future variants (lightguide/cookie coupling between fiber end and SiPM). Do not include placement in plugin. -->
+    <material name="DR_LightguideMedium">
+      <!-- Ported from DRsimMaterials.cc:77-175.
+           Source name "Glass" renamed to DR_LightguideMedium; see Q7 in header. -->
+      <D type="density" value="1.032" unit="g/cm3"/>
+      <!-- Mass fractions from source: 91.533% C + 8.467% H -->
+      <fraction n="0.91533" ref="C"/>
+      <fraction n="0.08467" ref="H"/>
+      <property name="RINDEX"    ref="RINDEX__DR_LightguideMedium"/>
+      <property name="ABSLENGTH" ref="ABSLENGTH__DR_LightguideMedium"/>
+    </material>
+
+    <!-- DR_FilterBody: Gelatin substrate for the long-pass optical filter
+         Ported from DRsimMaterials.cc:90-94 (composition) and 195-198 (optical).
+         Composition: C102H151N31O39 (photographic filter dye substrate), density 1.27 g/cm3.
+         RINDEX = 1.52 flat (from RI_gel[25] in source, applied to fGelatin).
+         The filter surface transmittance properties are on DR_FilterSurf (see surfaces below).
+
+         NOT bound to any volume in the default DR_Prototype geometry (plan decision 10, Q9).
+         Available as a Phase 3 diagnostic if C-channel yield overshoots target.
+    -->
+    <!-- UNUSED in default DR prototype geometry. Ported from source palette for future optical-filter diagnostic. Do not include placement in plugin. -->
+    <material name="DR_FilterBody">
+      <!-- Ported from DRsimMaterials.cc:90-198 -->
+      <D type="density" value="1.27" unit="g/cm3"/>
+      <composite n="102" ref="C"/>
+      <composite n="151" ref="H"/>
+      <composite n="31"  ref="N"/>
+      <composite n="39"  ref="O"/>
+      <property name="RINDEX" ref="RINDEX__DR_FilterBody"/>
+    </material>
+
+    <!--
+      DR_Air: SiPM window ambient medium.
+
+      DR_Air is ALIASED to AirOptical, which is already defined in
+      epic/compact/optical_materials.xml:999-1006.
+      AirOptical properties:
+        RINDEX    = 1.00029 (flat, 1.0-5.1 eV range) satisfies plan "RINDEX ~= 1.0"
+        ABSLENGTH = 4.0 cm (flat)
+      Composition: N(75.4%) + O(23.4%) + Ar(1.2%), density 0.0012 g/cm3.
+
+      Source: DRsimMaterials.cc:115-118 defines G4_AIR RINDEX = 1.0 flat (25 points);
+      our AirOptical is equivalent (1.00029 rounds to 1.0 at all relevant wavelengths).
+
+      Without RINDEX on the SiPM-window medium, G4OpBoundaryProcess emits NoRINDEX
+      warnings and photon boundary status is undefined (plan round-3 change 1a, R16).
+
+      Plugin implementation (P2-beta, todo 2b): use material name "AirOptical" for
+      the SiPM window volume.  No separate DR_Air material element is needed here.
+      If optical_materials.xml is ever reorganised and AirOptical removed, add:
+        <material name="DR_Air">
+          <D type="density" unit="g/cm3" value="0.0012"/>
+          <fraction n="0.754" ref="N"/>
+          <fraction n="0.234" ref="O"/>
+          <fraction n="0.012" ref="Ar"/>
+          <property name="RINDEX" coldim="2" values="1.0*eV 1.00029  5.1*eV 1.00029"/>
+        </material>
+    -->
+
+  </materials>
+
+  <!--
+    Optical surface definitions.
+    All prefixed DR_ to avoid name clashes.
+    Syntax follows epic/compact/optical_materials.xml:1165-1207 (dRICH surfaces).
+  -->
+  <surfaces>
+
+    <!-- DR_SiPMSurf: Hamamatsu S13615-1025N MPPC photosensitive surface
+         Final working configuration (confirmed 2026-07-28):
+           type = dielectric_dielectric, model = glisur, finish = polished
+           EFFICIENCY = 1.0 flat (all photons crossing the boundary are recorded)
+         PDE is NOT applied at sim time. Apply at reconstruction:
+           lambda [nm] = 2 * pi * hbarc [GeV*nm] / |p [GeV]|
+           hbarc = 0.197327e-6 GeV*nm
+           PDE(lambda) = np.interp(lambda, pde_lambda[::-1], pde_values[::-1])
+           where pde_lambda and pde_values are the EFFICIENCY__DR_SiPMSurf table.
+         Why dielectric_dielectric:
+           dielectric_metal: REFLECTIVITY table is read, but absorbed photons are
+           killed at the boundary before Geant4OpticalTrackerAction fires -> zero hits.
+           dielectric_dielectric: photon crosses into the sensitive volume, tracker
+           action fires on the step inside -> hit scored. EFFICIENCY table is ignored
+           (Fresnel transmission bypasses the roulette), but all photons are recorded
+           and wavelength is recoverable from hit momentum.
+         Verified tests (2026-07-28, same container, seed 12345, 1 muon 5 GeV):
+           dielectric_dielectric + EFFICIENCY=1  -> 1337 hits (baseline)
+           dielectric_metal + R=0.0 flat         ->    0 hits (absorbed, not scored)
+           dielectric_metal + R=1.0 flat         -> 1288 hits (reflected back, wrongly scored)
+           dielectric_metal + R=0.5 flat 25-pt   ->  655 hits (~50% reflected, wrongly scored)
+           lambda range from hit momentum: 301-900 nm, mean 547 nm (correct Cherenkov range)
+    -->
+    <opticalsurface name="DR_SiPMSurf" model="glisur" finish="polished" type="dielectric_dielectric">
+      <property name="EFFICIENCY" coldim="2" values="1*eV 1.0  7*eV 1.0"/>
+    </opticalsurface>
+
+    <!-- DR_MirrorSurf: generic 90% mirror for fiber far-end reflective caps
+         Ported from DRsimMaterials.cc:205-212 (fMirrorSurf).
+         type = dielectric_metal (source line 211).
+         REFLECTIVITY = 0.9 flat, TRANSMITTANCE = 0.0 flat.
+         NOT bound to any volume in the default geometry.
+         Available for future use if reflective fiber end-caps are added.
+    -->
+    <!-- UNUSED in default DR prototype geometry (dual-ended readout, no mirrored fiber end). Ported for future single-ended-readout variant. Do not bind in plugin. -->
+    <opticalsurface name="DR_MirrorSurf" model="glisur" finish="polished" type="dielectric_metal">
+      <property name="REFLECTIVITY" ref="REFLECTIVITY__DR_MirrorSurf"/>
+      <property name="TRANSMITTANCE" ref="TRANSMITTANCE__DR_MirrorSurf"/>
+    </opticalsurface>
+
+    <!-- DR_FilterSurf: long-pass yellow filter surface
+         Ported from DRsimMaterials.cc:189-203 (fFilterSurf).
+         type = dielectric_dielectric (source line 202).
+         Passes lambda > ~500 nm, blocks below ~420 nm.
+
+         DR_FilterSurf defined but not bound.  Bind as diagnostic only if
+         Phase 3 C-channel yield overshoots target.
+         (plan-dr-prototype.md section 2a, decision 10 / Q9)
+    -->
+    <opticalsurface name="DR_FilterSurf" model="glisur" finish="polished" type="dielectric_dielectric">
+      <property name="TRANSMITTANCE" ref="TRANSMITTANCE__DR_FilterSurf"/>
+      <property name="REFLECTIVITY"  ref="REFLECTIVITY__DR_FilterSurf"/>
+    </opticalsurface>
+
+  </surfaces>
+
+</lccdd>

@@ -101,6 +101,11 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   const double fiber_pitch_x      = dims.attr<double>(_Unicode(fiber_pitch_x));
   const double fiber_pitch_y      = dims.attr<double>(_Unicode(fiber_pitch_y));
   const double sipm_win_thickness = dims.attr<double>(_Unicode(sipm_window_thickness));
+  // Optional stagger flag: alternate rows offset by +pitch_x/2, row length N_x-1.
+  // Defaults to false so all existing compacts produce byte-identical geometry.
+  // DD4hep 1.37 has no 2-arg attr<T>(tag,default) — use hasAttr pattern (lines 113-115).
+  const bool fiber_stagger = dims.hasAttr(_Unicode(fiber_stagger))
+                               ? dims.attr<bool>(_Unicode(fiber_stagger)) : false;
   //const double sipm_win_gap       = dims.attr<double>(_Unicode(sipm_window_gap));
 
   // S:C ratio (integer attributes on the <detector> element)
@@ -145,9 +150,51 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
   // -------------------------------------------------------------------------
   // Lattice dimensions
   // -------------------------------------------------------------------------
-  const int N_x     = fiberCount(module_dx, fiber_pitch_x); // columns
+  const int N_x     = fiberCount(module_dx, fiber_pitch_x); // columns (even rows)
   const int N_y     = fiberCount(module_dy, fiber_pitch_y); // rows
-  const int N_total = N_x * N_y;
+
+  // Fiber lattice origin: lower-left fiber centroid (also used at placement time).
+  const double x0 = -module_dx / 2.0 + fiber_pitch_x / 2.0;
+  const double y0 = -module_dy / 2.0 + fiber_pitch_y / 2.0;
+
+  // Boundary rule (stagger only): a fiber is kept only if its full outer radius
+  // (fiber_od/2, i.e. 0.5 mm) stays inside the module face, i.e.
+  //     x_centroid + fiber_od/2 <= +module_dx/2   (within tolerance).
+  // Even rows start at x0 and fit N_x fibers.  Odd rows start half a pitch
+  // further out, so the last column is pushed past the edge and is dropped,
+  // yielding N_x-1 fibers and the observed 148/147 (22/21-style) alternation.
+  const double edge_tol  = 1e-9 * dd4hep::mm;
+  const double x_max_ctr = module_dx / 2.0 - fiber_od / 2.0 + edge_tol;
+  const double y_max_ctr = module_dy / 2.0 - fiber_od / 2.0 + edge_tol;
+
+  // Count how many fibers actually fit in a row with the given x offset.
+  auto rowFiberCount = [&](double offset) {
+    int n = 0;
+    while (n < N_x && (x0 + offset + n * fiber_pitch_x) <= x_max_ctr) ++n;
+    return n;
+  };
+  const int N_row_even = fiber_stagger ? rowFiberCount(0.0)                  : N_x;
+  const int N_row_odd  = fiber_stagger ? rowFiberCount(fiber_pitch_x / 2.0) : N_x;
+
+  // Rows must also respect the top edge; N_y from floor() already satisfies this
+  // for the nominal geometry, but guard explicitly in case of odd pitch choices.
+  int N_rows = 0;
+  while (N_rows < N_y && (y0 + N_rows * fiber_pitch_y) <= y_max_ctr) ++N_rows;
+
+  // Total fiber count depends on stagger mode.
+  // Stagger: ceil(N_rows/2) even rows + floor(N_rows/2) odd rows.
+  const int N_even_rows = (N_rows + 1) / 2; // rows with N_row_even fibers
+  const int N_odd_rows  = N_rows / 2;       // rows with N_row_odd  fibers
+  const int N_total = fiber_stagger
+                        ? N_even_rows * N_row_even + N_odd_rows * N_row_odd
+                        : N_x * N_y;
+
+  // Guard: CellID scheme is fiber:16 -> max index 65535.
+  if (N_total > 65535) {
+    printout(ERROR, "DRPrototype_geo",
+             "Fiber count %d exceeds CellID capacity 65535 — aborting!", N_total);
+    throw std::runtime_error("DRPrototype_geo: fiber CellID overflow (fiber:16 limit 65535)");
+  }
 
   // Count S and C fibers for the full lattice (for logging only)
   int N_S = 0, N_C = 0;
@@ -180,8 +227,18 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
            "S:C ratio = %d:%d, N_S=%d, N_C=%d, N_total=%d",
            sc_ratio_S, sc_ratio_C, N_S, N_C, N_total);
   printout(INFO, "DRPrototype_geo",
-           "Fiber lattice: N_x=%d (pitch=%.3f mm) x N_y=%d (pitch=%.3f mm)",
-           N_x, fiber_pitch_x/dd4hep::mm, N_y, fiber_pitch_y/dd4hep::mm);
+           "Fiber lattice: N_x=%d (pitch=%.3f mm) x N_y=%d (pitch=%.3f mm), stagger=%s",
+           N_x, fiber_pitch_x/dd4hep::mm, N_y, fiber_pitch_y/dd4hep::mm,
+           fiber_stagger ? "ON" : "OFF");
+  if (fiber_stagger) {
+    printout(INFO, "DRPrototype_geo",
+             "Stagger ON: %d even rows x %d fibers + %d odd rows x %d fibers = %d total",
+             N_even_rows, N_row_even, N_odd_rows, N_row_odd, N_total);
+    printout(INFO, "DRPrototype_geo",
+             "Stagger boundary rule: keep fiber if x_centre + od/2 <= %.4f mm "
+             "(odd rows shifted +%.4f mm drop their last column)",
+             module_dx / 2.0 / dd4hep::mm, fiber_pitch_x / 2.0 / dd4hep::mm);
+  }
   printout(INFO, "DRPrototype_geo",
            "Total SiPM windows: %d (2 per fiber)", 2 * N_total);
   printout(INFO, "DRPrototype_geo",
@@ -311,10 +368,6 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
            "Assembly grid: %d x %d cells (%.0f mm cell size)",
            grid_nx, grid_ny, grid_size/dd4hep::mm);
 
-  // Fiber lattice origin: lower-left fiber centroid
-  const double x0 = -module_dx / 2.0 + fiber_pitch_x / 2.0;
-  const double y0 = -module_dy / 2.0 + fiber_pitch_y / 2.0;
-
   // SiPM window z-positions relative to the fiber grid assembly local origin (z=0).
   // Fiber tube occupies [-fiber_half_length, +fiber_half_length].
   // Budget per end (from pbVol boundary inward):
@@ -353,17 +406,42 @@ static Ref_t create_detector(Detector& desc, xml::Handle_t handle, SensitiveDete
       bool cell_has_fibers = false;
 
       // Assign fibers whose centroid falls in this grid cell
-      for (int iy = 0; iy < N_y; ++iy) {
-        for (int ix = 0; ix < N_x; ++ix) {
+      for (int iy = 0; iy < (fiber_stagger ? N_rows : N_y); ++iy) {
 
-          const double fx = x0 + ix * fiber_pitch_x;  // fiber x centroid (pbVol frame)
-          const double fy = y0 + iy * fiber_pitch_y;  // fiber y centroid (pbVol frame)
+        // Stagger: odd rows are offset by +pitch_x/2 and hold N_row_odd fibers.
+        // Even rows (iy%2==0): N_row_even fibers at x = x0 + ix*pitch_x.
+        // Odd  rows (iy%2==1): N_row_odd  fibers at x = x0 + pitch_x/2 + ix*pitch_x.
+        // Row y spacing is UNCHANGED: y = y0 + iy*pitch_y.
+        const bool is_odd_row   = fiber_stagger && (iy % 2 == 1);
+        const int  row_n        = !fiber_stagger ? N_x
+                                                 : (is_odd_row ? N_row_odd : N_row_even);
+        const double row_offset = is_odd_row ? fiber_pitch_x / 2.0 : 0.0;
+
+        for (int ix = 0; ix < row_n; ++ix) {
+
+          const double fx = x0 + row_offset + ix * fiber_pitch_x; // fiber x (pbVol frame)
+          const double fy = y0 + iy * fiber_pitch_y;               // fiber y (pbVol frame)
 
           if (fx < gx_min || fx >= gx_max) continue;
           if (fy < gy_min || fy >= gy_max) continue;
 
-          // Global fiber index (row-major order)
-          const int fiber_idx = iy * N_x + ix;
+          // Global fiber index.
+          // Non-staggered: classic row-major formula (unchanged, bit-for-bit).
+          // Staggered: the naive iy*N_x+ix formula would collide/gap once rows
+          // alternate in length, so we use a contiguous global running index.
+          //
+          // NOTE: a literal "++counter" cannot be used here because this lattice
+          // loop is nested INSIDE the grid-cell loop, so every fiber is visited
+          // grid_nx*grid_ny times and only placed in its own cell.  The closed
+          // form below is the exact value such a counter would hold in placement
+          // order: it counts all fibers in the rows preceding iy, then adds ix.
+          //   even rows before iy: ceil(iy/2) = (iy+1)/2
+          //   odd  rows before iy: floor(iy/2) = iy/2
+          const int stagger_row_base =
+              ((iy + 1) / 2) * N_row_even + (iy / 2) * N_row_odd;
+          const int fiber_idx = fiber_stagger
+                                  ? stagger_row_base + ix // stagger: contiguous, unique
+                                  : iy * N_x + ix;        // non-stagger: row-major
 
           // S/C assignment (deterministic, plan decision 4):
           //   position in period = fiber_idx % sc_period
